@@ -111,6 +111,35 @@ GitHub.prototype.getRepoFromPath = function(showInNonCodePage, currentRepo) {
 }
 
 /**
+ * Fetch the repos for a given user or organization
+ * @param opts: {repo: repository, token (optional): user access token, apiUrl (optional: baseAPI URL)}
+ * @param cb(err: error, tree: array of repos)
+ */
+GitHub.prototype.fetchRepos = function(opts, cb) {
+  var repo = opts.repo;
+
+  function getOwnerPath(cb){
+    getInDefaultHost(opts.token, '/' + repo.username + '/' + repo.reponame, function(err, data){
+      if (err) return cb(err);
+      var url = data.owner.repos_url;
+      //If you want to see private repos of an org, you have to construct the org's repo url
+      if (data.owner.type == 'Organization'){
+        url = url.replace('/users/', '/orgs/');
+      }
+      cb(null, url);
+    });
+  }
+
+  getOwnerPath(function(err, repoUrl){
+    if (err) return cb(err);
+    get(opts.token, repoUrl, function(err, repoData){
+      if (err) return cb(err);
+      cb(null, repoData);
+    })
+  })
+}
+
+/**
  * Fetches data of a particular repository.
  * @param opts: { repo: repository, token (optional): user access token, apiUrl (optional): base API URL }
  * @param cb(err: error, tree: array (of arrays) of items)
@@ -195,79 +224,89 @@ GitHub.prototype.fetchData = function(opts, cb) {
   })
 
   function getTree(tree, cb) {
-   get('/git/trees/' + tree, function(err, res) {
+   getInRepo('/git/trees/' + tree, function(err, res) {
       if (err) return cb(err)
       cb(null, res.tree)
     })
   }
 
   function getBlob(sha, cb) {
-    get('/git/blobs/' + sha, function(err, res) {
+    getInRepo('/git/blobs/' + sha, function(err, res) {
       if (err) return cb(err)
       cb(null, atob(res.content.replace(/\n/g,'')))
     })
   }
 
-  function get(path, cb) {
-    var token = opts.token
-      , host  = (location.host === 'github.com' ? 'api.github.com' : (location.host + '/api/v3'))
-      , base  = location.protocol + '//' + host + '/repos/' + repo.username + '/' + repo.reponame
-      , cfg   = { method: 'GET', url: base + path, cache: false }
-
-    if (token) cfg.headers = { Authorization: 'token ' + token }
-    $.ajax(cfg)
-      .done(function(data) {
-        cb(null, data)
-      })
-      .fail(function(jqXHR) {
-        var createTokenUrl = location.protocol + '//' + location.host + '/settings/tokens/new'
-          , error
-          , message
-          , needAuth
-
-        switch (jqXHR.status) {
-          case 0:
-            error = 'Connection error'
-            message = 'Cannot connect to GitHub. If your network connection to GitHub is fine, maybe there is an outage of the GitHub API. Please try again later.'
-            needAuth = false
-            break
-          case 401:
-            error = 'Invalid token'
-            message = 'The token is invalid. Follow <a href="' + createTokenUrl + '" target="_blank">this link</a> to create a new token and paste it below.'
-            needAuth = true
-            break
-          case 409:
-            error = 'Empty repository'
-            message = 'This repository is empty.'
-            break
-          case 404:
-            error = 'Private repository'
-            message = 'Accessing private repositories requires a GitHub access token. Follow <a href="' + createTokenUrl + '" target="_blank">this link</a> to create one and paste it below.'
-            needAuth = true
-            break
-          case 403:
-            if (~jqXHR.getAllResponseHeaders().indexOf('X-RateLimit-Remaining: 0')) {
-              error = 'API limit exceeded'
-              message = 'You have exceeded the GitHub API hourly limit and need GitHub access token to make extra requests. Follow <a href="' + createTokenUrl + '" target="_blank">this link</a> to create one and paste it below.'
-              needAuth = true
-              break
-            }
-            else {
-              error = 'Forbidden'
-              message = 'You are not allowed to access the API. You might need to provide an access token. Follow <a href="' + createTokenUrl + '" target="_blank">this link</a> to create one and paste it below.'
-              needAuth = true
-              break
-            }
-          default:
-            error = message = jqXHR.statusText
-            needAuth = false
-            break
-        }
-        cb({
-          error    : 'Error: ' + error,
-          message  : message,
-          needAuth : needAuth,
-        })
-      })
+  function getInRepo(path, cb){
+    getInDefaultHost(opts.token, '/' + repo.username + '/' + repo.reponame + path, cb);
   }
+
+}
+
+function getInDefaultHost(token, path, cb){
+  var host  = (location.host === 'github.com' ? 'api.github.com' : (location.host + '/api/v3'))
+  , base  = location.protocol + '//' + host + '/repos'
+
+  get(token, base + path, cb);
+}
+
+function get(token, url, cb) {
+  var host  = (location.host === 'github.com' ? 'api.github.com' : (location.host + '/api/v3'))
+  , cfg   = { method: 'GET', url: url, cache: false }
+
+  if (token) cfg.headers = { Authorization: 'token ' + token }
+  $.ajax(cfg)
+    .done(function(data) {
+      cb(null, data)
+    })
+    .fail(function(jqXHR) {
+      var createTokenUrl = location.protocol + '//' + location.host + '/settings/tokens/new'
+      , error
+      , message
+      , needAuth
+
+      switch (jqXHR.status) {
+      case 0:
+        error = 'Connection error'
+        message = 'Cannot connect to GitHub. If your network connection to GitHub is fine, maybe there is an outage of the GitHub API. Please try again later.'
+        needAuth = false
+        break
+      case 401:
+        error = 'Invalid token'
+        message = 'The token is invalid. Follow <a href="' + createTokenUrl + '" target="_blank">this link</a> to create a new token and paste it below.'
+        needAuth = true
+        break
+      case 409:
+        error = 'Empty repository'
+        message = 'This repository is empty.'
+        break
+      case 404:
+        error = 'Private repository'
+        message = 'Accessing private repositories requires a GitHub access token. Follow <a href="' + createTokenUrl + '" target="_blank">this link</a> to create one and paste it below.'
+        needAuth = true
+        break
+      case 403:
+        if (~jqXHR.getAllResponseHeaders().indexOf('X-RateLimit-Remaining: 0')) {
+          error = 'API limit exceeded'
+          message = 'You have exceeded the GitHub API hourly limit and need GitHub access token to make extra requests. Follow <a href="' + createTokenUrl + '" target="_blank">this link</a> to create one and paste it below.'
+          needAuth = true
+          break
+        }
+        else {
+          error = 'Forbidden'
+          message = 'You are not allowed to access the API. You might need to provide an access token. Follow <a href="' + createTokenUrl + '" target="_blank">this link</a> to create one and paste it below.'
+          needAuth = true
+          break
+        }
+      default:
+        error = message = jqXHR.statusText
+        needAuth = false
+        break
+      }
+      cb({
+        error    : 'Error: ' + error,
+        message  : message,
+        needAuth : needAuth,
+      })
+    })
 }

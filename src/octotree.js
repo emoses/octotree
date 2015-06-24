@@ -110,7 +110,16 @@ $(document).ready(function() {
             adapter.fetchData({ repo: repo, token: token }, function(err, tree) {
               if (err) errorView.show(err)
               else treeView.show(repo, tree)
-            })
+            });
+            adapter.fetchRepos({repo: repo, token: token}, function(err, repos) {
+              if (err) console.error(err);
+              else {
+                var repoNames = repos.map(function(r){
+                  return r.name;
+                });
+                console.log(repoNames);
+              }
+            });
           }
           else treeView.syncSelection()
         }
