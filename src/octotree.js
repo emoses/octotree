@@ -112,13 +112,8 @@ $(document).ready(function() {
               else treeView.show(repo, tree)
             });
             adapter.fetchRepos({repo: repo, token: token}, function(err, repos) {
-              if (err) console.error(err);
-              else {
-                var repoNames = repos.map(function(r){
-                  return r.name;
-                });
-                console.log(repoNames);
-              }
+              if (err) errorView.show(err);
+              else treeView.showRepos(repo, repos);
             });
           }
           else treeView.syncSelection()

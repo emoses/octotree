@@ -130,13 +130,24 @@ GitHub.prototype.fetchRepos = function(opts, cb) {
     });
   }
 
+  //Recursively get all repo data, following next page in Links header
+  function getRepoData(data, url, cb){
+    get(opts.token, url, function(err, repoData, nextUrl){
+      if (err) return cb(err);
+      var allData = data.concat(repoData);
+      if (nextUrl){
+        getRepoData(allData, nextUrl, cb);
+      } else {
+        cb(null, allData);
+      }
+    })
+  }
+
+
   getOwnerPath(function(err, repoUrl){
     if (err) return cb(err);
-    get(opts.token, repoUrl, function(err, repoData){
-      if (err) return cb(err);
-      cb(null, repoData);
-    })
-  })
+    getRepoData([], repoUrl, cb);
+  });
 }
 
 /**
@@ -250,14 +261,30 @@ function getInDefaultHost(token, path, cb){
   get(token, base + path, cb);
 }
 
+function getNextUrlFromHeader(jqXHR){
+  var links = jqXHR.getResponseHeader("Link");
+  if (!links){
+    return null;
+  }
+  var parts = links.split(',');
+  var url = null;
+  parts.forEach(function(part){
+    var section = part.split(';');
+    if (section.length == 2 && section[1].trim() == 'rel="next"'){
+      url = section[0].replace(/<(.*)>/, '$1').trim();
+    }
+  });
+  return url;
+}
+
 function get(token, url, cb) {
   var host  = (location.host === 'github.com' ? 'api.github.com' : (location.host + '/api/v3'))
   , cfg   = { method: 'GET', url: url, cache: false }
 
   if (token) cfg.headers = { Authorization: 'token ' + token }
   $.ajax(cfg)
-    .done(function(data) {
-      cb(null, data)
+    .done(function(data, status, xhr) {
+      cb(null, data, getNextUrlFromHeader(xhr))
     })
     .fail(function(jqXHR) {
       var createTokenUrl = location.protocol + '//' + location.host + '/settings/tokens/new'

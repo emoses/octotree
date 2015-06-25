@@ -42,6 +42,24 @@
   height: 100%;
   overflow: auto;
 
+  .octotree_view_repos {
+    margin-left: 12px;
+    .octotree_repos {
+      display: none;
+    }
+    .octotree_repos.open {
+      display:block;
+    }
+    ul.repoList {
+      list-style-type: none;
+
+      li {
+        padding-left: 12px;
+      }
+    }
+  }
+
+
   .octotree_view {
     display: none;
     &.current {

@@ -2,6 +2,11 @@ function TreeView($dom, store, adapter) {
   this.$view = $dom.find('.octotree_treeview')
   this.store = store
   this.adapter = adapter
+  this.$view.find('#toggleOtherRepos').click(function(e) {
+    e.preventDefault();
+    $('.octotree_repos').toggleClass('open');
+  });
+
   this.$view
     .find('.octotree_view_body')
     .on('click.jstree', '.jstree-open>a', function() {
@@ -98,6 +103,27 @@ TreeView.prototype.show = function(repo, treeData) {
     })
   }
 }
+
+TreeView.prototype.showRepos = function(repo, repos){
+  var reposSorted = repos.sort(function(a, b){
+    var aName = a.name.toLowerCase(),
+        bName = b.name.toLowerCase();
+    return aName === bName ? 0 : aName < bName ? -1 : 1;
+  });
+
+  var repoHtml = reposSorted.reduce(function(acc, r){
+    if (r.name == repo.reponame){
+      return acc;
+    } else {
+      return acc + '<li class="repoLink"><a href="' + r.html_url + '">' + r.name + '</a></li>';
+    }
+  }, "");
+
+  this.$view.find('.octotree_repos')
+    .html('<ul class="repoList">' + repoHtml + '</ul>');
+}
+
+
 
 TreeView.prototype.syncSelection = function() {
   var tree = this.$view.find('.octotree_view_body').jstree(true)
