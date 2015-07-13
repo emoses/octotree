@@ -36,7 +36,7 @@ chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab) {
       return function(file, cb) {
         chrome.tabs[fn](tabId, { file: file, runAt: 'document_start' }, cb)
       }
-    }
+ _   }
   })
 })
 

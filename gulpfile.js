@@ -1,4 +1,4 @@
-var gulp  = require('gulp')
+var gulp  = equire('gulp')
   , path  = require('path')
   , merge = require('event-stream').merge
   , map   = require('map-stream')
